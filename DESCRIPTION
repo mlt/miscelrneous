@@ -1,6 +1,6 @@
 Package: tmdl
-Version: 0.1-0
-Date: 2010-10-05
+Version: 0.1-1
+Date: 2010-10-06
 Title: Flow and Load Duration Curve plots for TMDL
 Author: Mikhail Titov <mlt@gmx.us>
 Maintainer: Mikhail Titov <mlt@gmx.us>
