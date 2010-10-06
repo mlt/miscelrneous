@@ -1,10 +1,10 @@
 Package: tmdl
-Version: 0.1-1
+Version: 0.1-2
 Date: 2010-10-06
 Title: Flow and Load Duration Curve plots for TMDL
 Author: Mikhail Titov <mlt@gmx.us>
 Maintainer: Mikhail Titov <mlt@gmx.us>
-Depends: lattice
+Depends: lattice, latticeExtra
 Description: This project assists in creation of
  professionally looking Flow and Load Duration Curve plots
  for TMDL studies.
