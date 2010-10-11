@@ -15,11 +15,13 @@ function (data, names = list(), type, scales = list(), xlab = "Flow Duration Int
     xyplot(f, data, type = type, ..., scales = scales, xscale.components = xscale.components.fi,
         yscale.components = yscale.components.log10ticks, xlab = xlab,
         ylab = ylab, panel = function(...) {
-            panel.loggrid()
+            panel.tmdlgrid()
             panel.xyplot(...)
         })
 }
 
+# TODO: check if default 1.5 IQR for whiskers is close to 10th and 90th percentiles used in TMDL
+# may need to provide custom stats instead of boxplot.stats for that
 ldplot <-
 function (data, names = list(), mult = 2.446576, target = 0.1,
     xlab = "Flow Duration Interval (%)", ylab = "Load", key = list(), scales = list(), ...)
@@ -37,11 +39,10 @@ function (data, names = list(), mult = 2.446576, target = 0.1,
     sub[90 <= sub[,names$exc], "grp"] = 95
     target.load <- data[, names$cfs] * target * mult
     panel.ld <- function(x, ...) {
-        panel.loggrid()
+        panel.tmdlgrid()
         panel.lines(data[, names$exc], log10(target.load), col = key$lines$col[1])
         panel.points(sub[, names$exc], log10(sub$load), col = key$points$col[1])
-        panel.bwplot(as.numeric(as.character(sub$grp)), box.width = 4,
-            pch = "|", ...)
+        panel.bwplot.tmdl(as.numeric(as.character(sub$grp)), box.width = 4, ...)
     }
     ylim <- range(target.load[target.load>0], sub$load[sub$load>0], na.rm = TRUE) * c(0.8, 1.2)
     key.default <- list(lines = list(col = "darkgreen", lty = c(1, 0)),
@@ -57,14 +58,51 @@ function (data, names = list(), mult = 2.446576, target = 0.1,
         panel = panel.ld)
 }
 
-panel.loggrid <-
-function ()
+# monthly variation plot
+mvplot <-
+function (data)
 {
-    ylim <- 10^current.panel.limits()$ylim
-    panel.abline(v = c(20, 30, 50, 70, 80), lty = 3, col = "gray90")
-    panel.abline(h = log10(latticeExtra:::logTicks(ylim, 2:9)), lty = 3, col = "gray90")
+    scales <- list(x = list(alternating = 3, cex = c(1, 0.7)))
+    tmp <- data.frame(month=factor(months(as.POSIXct(data$date),TRUE), rev(month.abb)),
+                      exc = data$exc)
+    bwplot(month ~ exc, tmp,
+    horizontal=TRUE, xscale.components = xscale.components.fi, scales=scales,
+    panel=function(...) {
+        panel.tmdlgrid(FALSE)
+#        panel.bwplot(..., stats=tmdl.stats)
+        panel.bwplot.tmdl(..., box.width = .5)
+    })
+}
+
+panel.bwplot.tmdl <-
+function (x, y, horizontal, ...)
+{
+    ps.orig <- ps <- trellis.par.get("plot.symbol")
+    ps$pch <- 8
+    ps$cex <- .5
+    trellis.par.set("plot.symbol", ps)
+    panel.bwplot(x, y, horizontal, pch="|", cex=0.5, ..., stats = tmdl.stats)
+    trellis.par.set("plot.symbol", ps.orig)
+    if (horizontal) {
+        xx <- tapply(x, y, function(x) mean(x, na.rm = TRUE))
+        panel.points(xx, seq(1,along=xx), pch = 18, cex = 1)
+    }
+    else {
+        yy <- tapply(y, x, function(x) mean(x, na.rm = TRUE))
+        panel.points(names(yy), yy, pch = 18, cex = 1)
+    }
+}
+
+panel.tmdlgrid <-
+function (y = TRUE)
+{
     panel.abline(v = c(0, 10, 40, 60, 90, 100), lty = 3, col = "gray60")
-    panel.abline(h = log10(latticeExtra:::logTicks(ylim, 1)), lty = 3, col = "gray60")
+    panel.abline(v = c(20, 30, 50, 70, 80), lty = 3, col = "gray90")
+    if (y) {
+        ylim <- 10^current.panel.limits()$ylim
+        panel.abline(h = log10(latticeExtra:::logTicks(ylim, 2:9)), lty = 3, col = "gray90")
+        panel.abline(h = log10(latticeExtra:::logTicks(ylim, 1)), lty = 3, col = "gray60")
+    }
 }
 
 rankflow <-
@@ -108,11 +146,25 @@ function (data, pol, names = list(), sort = TRUE)
     data.daily
 }
 
+# original boxplot.stats https://svn.r-project.org/R/trunk/src/library/grDevices/R/calc.R
+tmdl.stats <-
+function (x, coef = 1.5, do.conf = TRUE, do.out = TRUE)
+{
+    nna <- !is.na(x)
+    n <- sum(nna)                       # including +/- Inf
+    stats <- quantile(x, c(.1,.25,.5,.75,.9), na.rm = TRUE, names = FALSE)
+    out <- x < stats[1] | x > stats[5]
+    iqr <- diff(stats[c(2, 4)])
+    conf <- if(do.conf) stats[3L] + c(-1.58, 1.58) * iqr / sqrt(n)
+    list(stats = stats, n = n, conf = conf,
+	 out = if(do.out) x[out & nna] else numeric(0L))
+}
+
 xscale.components.fi <-
 function (...)
 {
     ans <- xscale.components.default(...)
-    ans$bottom$ticks$at <- c(0, 10, 40, 60, 90, 100)
+    ans$bottom$ticks$at <- seq(0, 100, 10)
     ans$bottom$labels$labels <- ans$bottom$ticks$at
     ans$top <- ans$bottom
     ans$top$labels$labels <- c("High flows", "Moist conditions",
