@@ -1,4 +1,4 @@
-# data from USGS gage 
+# data from USGS gage
 #require(tmdl)
 library(latticeExtra)
 source('../R/tmdl.R')
@@ -16,5 +16,9 @@ x$cfs <- as.numeric(x$cfs)
 x$date <- as.POSIXct(x$date, format="%Y-%m-%d")
 z <- rankflow(x,pol)
 turb2tss <- function(x) 10^(0.920*log10(x)-0.230)
-fig <- ldplot(z, names=list(pol="TSS..mg.L."), target = turb2tss(10))
+tmdl1 <- tmdl(z, names=list(pol="TSS..mg.L."), WQS = turb2tss(10))
+#fig <- ldplot(tmdl1)
+print(summary(tmdl1))
+#fig <- ldplot(z, names=list(pol="TSS..mg.L."), target = turb2tss(10))
+fig <- ldplot(tmdl1)
 plot(fig)

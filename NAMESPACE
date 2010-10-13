@@ -1,2 +1,2 @@
-export(fdplot,ldplot,rankflow)
+export(fdplot,ldplot,rankflow,summary.tmdl,tmdl,tmdl.stats)
 import(lattice)
