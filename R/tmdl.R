@@ -1,9 +1,9 @@
 fi <- data.frame(
                  breaks = c(10,40,60,90,100),
-                 labels = c("High flows", "Moist conditions", "Mid-range flows", "Dry conditions", "Low flows"),
-                 mids = breaks - diff(c(0,breaks)) / 2
+                 labels = c("High flows", "Moist conditions", "Mid-range flows", "Dry conditions", "Low flows")
                  )
-grpfun = stepfun(breaks, c(mids, mids[length(mids)]))
+fi$mids = with(fi, breaks - diff(c(0,breaks)) / 2)
+grpfun = with(fi,stepfun(breaks, c(mids, mids[length(mids)])))
 
 fdplot <-
 function (data, names = list(), type, scales = list(), xlab = "Flow Duration Interval (%)", values = TRUE,
@@ -23,7 +23,7 @@ function (data, names = list(), type, scales = list(), xlab = "Flow Duration Int
         xscale.components = xscale.components.fi, intervals = intervals,
         yscale.components = yscale.components.log10ticks, xlab = xlab,
         ylab = ylab, panel = function(x, y, ..., intervals) {
-            panel.tmdlgrid()
+            panel.tmdlgrid(intervals = intervals)
             panel.xyplot(x, y, ...)
             if (values) {
                 yy = approx(x, 10^y, c(0, intervals$breaks))
@@ -53,7 +53,7 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA, i
     ylim <- range(mydata$target[mydata$target>0], sub$load[sub$load>0], na.rm = TRUE) * c(0.8, 1.2)
     key.default <- list(lines = list(col = c("darkgreen", NA, "red"), lty = c(1, 0, 1)),
                         points = list(col = "#ff00ff", pch = c(NA, 1, NA)),
-                        text = list(lab = c("Target", "Measured", "Waste Allocation")),
+                        text = list(lab = c("TMDL", "Measured", expression(sum(WLA)))),
                         columns = 3, rep = TRUE, space = "bottom")
     key <- modifyList(key.default, key)
     scales.default <- list(y = list(log = 10), x = list(alternating = 3, cex = c(1, 0.7)))
@@ -74,15 +74,15 @@ function (tmdl, ...)
 
 # monthly variation plot
 mvplot <-
-function (data)
+function (data, intervals = fi)
 {
     scales <- list(x = list(alternating = 3, cex = c(1, 0.7)))
     tmp <- data.frame(month=factor(months(as.POSIXct(data$date),TRUE), rev(month.abb)),
                       exc = data$exc)
-    bwplot(month ~ exc, tmp,
+    bwplot(month ~ exc, tmp, intervals = intervals,
     horizontal=TRUE, xscale.components = xscale.components.fi, scales=scales,
     panel=function(...) {
-        panel.tmdlgrid(FALSE)
+        panel.tmdlgrid(FALSE, intervals = intervals)
         panel.bwplot.tmdl(..., box.width = .5)
     })
 }
@@ -107,9 +107,9 @@ function (x, y, horizontal, ...)
 }
 
 panel.ld <-
-function(x, ..., mydata, names, WLA)
+function(x, ..., mydata, names, WLA, intervals)
 {
-    panel.tmdlgrid()
+    panel.tmdlgrid(TRUE, intervals = intervals)
     panel.abline(h = log10(WLA), col = "red", lwd = 1.5)
     panel.lines(mydata[, names$exc], log10(mydata$target), col = "darkgreen")# , col = key$lines$col[1])
     panel.points(mydata[, names$exc], log10(mydata$load), col = "#ff00ff")#, col = key$points$col[1])
@@ -117,9 +117,9 @@ function(x, ..., mydata, names, WLA)
 }
 
 panel.tmdlgrid <-
-function (y = TRUE)
+function (y = TRUE, intervals)
 {
-    panel.abline(v = c(0, breaks), lty = 3, col = "gray60")
+    panel.abline(v = c(0, intervals$breaks), lty = 3, col = "gray60")
     panel.abline(v = c(20, 30, 50, 70, 80), lty = 3, col = "gray90")
     if (y) {
         ylim <- 10^current.panel.limits()$ylim
@@ -183,28 +183,58 @@ function (object)
 #    print("world")
 #    NextMethod("summary")
     out <- as.data.frame(t(sapply(object$stats, function(x) x$stats[5])))
+    out <- rbind(out, object$MOS, object$TMDL, object$WLA, object$LA)
 #    out <- data.frame('q90' = sapply(object$stats, function(x) x$stats[5]))
-    rownames(out)[1] <- '90th'
-    out
+    rownames(out) <- c('90th','MOS','TMDL','WLA','LA')
+    red <- 1 - (object$TMDL - object$MOS)/out['90th',]
+    red[red<0] <- NA
+    out <- rbind(out, Reduction = red*100)
+    out <- out[c(3:1,4,5,6),]
+    format(out, digits=2, scientific = FALSE)
 #    str(object$stats$'5'$stats[5])
 }
 
+# MOS can be
+# TRUE to calculate as difference between median and low flow in each zone
+# percentage as between 0 and 1
+# FALSE to skip MOS
+# FIXME: MS4 WLA???
 tmdl <-
-function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 0, intervals = fi)
+function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 0, MOS = TRUE, intervals = fi)
 {
     names.default <- list(cfs = "cfs", exc = "exc", pol = "pol")
     names <- modifyList(names.default, names)
     mydata <- subset(data, select = c(names$exc, names$cfs, names$pol)) # FIXME: remove names$pol in the future. Used in current ldplot.tmdl only
     mydata$target <- mydata[, names$cfs] * target * mult
     mydata$load <- mydata[, names$cfs] * data[, names$pol] * mult
+    mydata$grp <- factor(grpfun(mydata[, names$exc]), intervals$mids)
+
+    targetfun <- approxfun(mydata$exc, mydata$target)
+    TMDL.mids <- targetfun(intervals$mids)
+
+    if (is.logical(MOS) & MOS) {
+        TMDL.breaks <- targetfun(intervals$breaks)
+        MOS <- TMDL.mids - TMDL.breaks
+        MOS.len <- length(MOS)
+        if (diff(tail(MOS,2))> 0 )
+            MOS[MOS.len] <- MOS[MOS.len - 1]    # skewed for low flows
+    } else if (is.numeric(MOS)) {
+        MOS <- TMDL.mids * MOS
+    }
+
+    LA <- TMDL.mids - MOS - WLA
+
     # for box & whiskers plot
     sub <- subset(mydata, !is.na(load), c(names$cfs, names$exc, 'load'))
     sub$grp <- factor(grpfun(sub[, names$exc]), intervals$mids)
     blist <- tapply(sub$load, sub$grp, tmdl.stats)
     names(blist) <- fi$labels
 
+    # FIXME: need reduction for LA
+
     out <- list(data = mydata, stats = blist, names = names,
-                WQS = target, mult = mult, WLA = WLA)
+                WQS = target, mult = mult,
+                WLA = WLA, MOS = MOS, TMDL = TMDL.mids, LA = LA)
     class(out) <- "tmdl"
     out
 }

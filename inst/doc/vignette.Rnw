@@ -1,0 +1,84 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{ae}
+%\def\pgfsysdriver{pgfsys-tex4ht.def} 
+\usepackage{tikz}
+
+\begin{document}
+
+Load data
+
+<<load>>=
+# data from USGS gage 
+#require(tmdl)
+library(latticeExtra)
+source('../R/tmdl.R')
+#file <- file.path(.path.package('tmdl'), 'data', 'USGS_04015330_Knife_River.txt')
+x <- read.table('c:/workspace/tmdl/pkg/data/USGS_04015330_Knife_River.txt', skip=29, as.is=TRUE)
+names(x)  <-  c("agency", "site", "date", "cfs", "status")
+x$agency <- NULL
+x$site <- NULL
+x$status <- NULL
+x$cfs[x$cfs=='Ice'] <- NA
+x$cfs <- as.numeric(x$cfs)
+x$date <- as.POSIXct(x$date, format="%Y-%m-%d")
+pol=read.csv('c:/workspace/tmdl/pkg/data/water_chemistry_data_02026001_1974-07-01_2010-10-07.csv')
+pol$date = as.POSIXct(pol$Timestamp)
+pol$Timestamp = NULL
+@
+
+First rows are
+
+<<usgs>>=
+head(x,31)
+head(pol)
+@
+
+Now calculate exceedance
+<<exc>>=
+z <- rankflow(x,pol)
+turb2tss <- function(x) 10^(0.920*log10(x)-0.230)
+@
+
+Monthly flow variation with legend
+
+<<mv>>=
+mv <- mvplot(z)
+key = list(text=list(lab=c("Date range",paste(range(z$date),collapse=" -- "))),space = "bottom")
+mv=update(mv, key=key)
+@
+
+\begin{figure}
+\centering
+<<mv_fig,fig=TRUE,sanitize=FALSE>>=
+plot(mv)
+@
+\caption{Exceedance by month}
+\end{figure}
+
+\begin{figure}
+\centering
+<<fd,fig=TRUE,sanitize=FALSE>>=
+fd <- fdplot(z, ylab=list("Flow (cfs)", cex=1.5, col='red'), main="USGS gage 04015330")
+plot(fd)
+@
+\caption{Flow duration}
+\end{figure}
+
+TMDL in essense
+
+<<tmdl>>=
+tmdl1 <- tmdl(z, names=list(pol="TSS..mg.L."), target = turb2tss(10), MOS=FALSE)
+summary(tmdl1)
+@
+
+\begin{figure}
+\centering
+<<ld,fig=TRUE,sanitize=FALSE>>=
+ld <- ldplot(tmdl1)
+plot(ld)
+@
+\caption{Load duration}
+\end{figure}
+
+\end{document}
