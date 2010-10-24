@@ -27,7 +27,7 @@ function (data, names = list(), type, scales = list(), xlab = "Flow Duration Int
             panel.xyplot(x, y, ...)
             if (values) {
                 yy = approx(x, 10^y, c(0, intervals$breaks))
-                panel.text(yy$x, log10(yy$y * 1.3), yy$y, pos = 4)
+                panel.text(yy$x, log10(yy$y), format(yy$y), adj=c(0.3,-1),cex=.8)
             }
         })
 }
@@ -38,7 +38,7 @@ ldplot <- function(...)
 # TODO: check if default 1.5 IQR for whiskers is close to 10th and 90th percentiles used in TMDL
 # may need to provide custom stats instead of boxplot.stats for that
 ldplot.default <-
-function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA, intervals = fi,
+function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = NA, intervals = fi, coef = .1, do.out = FALSE,
     xlab = "Flow Duration Interval (%)", ylab = "Load", key = list(), scales = list(), ...)
 {
     names.default <- list(cfs = "cfs", exc = "exc", pol = "pol")
@@ -51,14 +51,24 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA, i
                   c(names$cfs, names$exc, 'load'))
     sub$grp <- factor(grpfun(sub[, names$exc]), intervals$mids)
     ylim <- range(mydata$target[mydata$target>0], sub$load[sub$load>0], na.rm = TRUE) * c(0.8, 1.2)
-    key.default <- list(lines = list(col = c("darkgreen", NA, "red"), lty = c(1, 0, 1)),
-                        points = list(col = "#ff00ff", pch = c(NA, 1, NA)),
-                        text = list(lab = c("TMDL", "Measured", expression(sum(WLA)))),
-                        columns = 3, rep = TRUE, space = "bottom")
+    key.df <- data.frame(lab=c("LC", "Measured", "WLA"),
+                         col=c("darkgreen", "#ff00ff", "red"),
+                         lty=c(1,0,1),
+                         pch=c(NA,1,NA),
+                         stringsAsFactors = FALSE)
+    key.out <- key.df[2,]
+    if (!is.na(WQS))
+        key.out <- rbind(key.out, key.df[1,])
+    if (!is.na(WLA))
+        key.out <- rbind(key.out, key.df[3,])
+    key.default <- list(lines = list(col = key.out$col, lty = key.out$lty),
+                        points = list(col = key.out$col, pch = key.out$pch),
+                        text = list(lab = key.out$lab),
+                        columns = length(key.out$col), rep = TRUE, space = "bottom")
     key <- modifyList(key.default, key)
     scales.default <- list(y = list(log = 10), x = list(alternating = 3, cex = c(1, 0.7)))
     scales <- modifyList(scales.default, scales)
-    bwplot(load ~ grp, sub, scales = scales, mydata = mydata, mysub = sub, names = names, WLA = WLA,
+    bwplot(load ~ grp, sub, scales = scales, mydata = mydata, mysub = sub, names = names, WLA = WLA, coef = coef, do.out = do.out,
         xscale.components = xscale.components.fi, intervals = intervals,
         yscale.components = yscale.components.log10ticks, ylim = ylim,
         key = key, xlim = c(-5, 105), xlab = xlab, ylab = ylab,
@@ -74,27 +84,39 @@ function (tmdl, ...)
 
 # monthly variation plot
 mvplot <-
-function (data, intervals = fi)
+function (data, names = list(), intervals = fi, stats = tmdl.stats, coef=.1, do.out=FALSE)
 {
+    names.default <- list(date = "date", exc = "exc")
+    names <- modifyList(names.default, names)
     scales <- list(x = list(alternating = 3, cex = c(1, 0.7)))
-    tmp <- data.frame(month=factor(months(as.POSIXct(data$date),TRUE), rev(month.abb)),
-                      exc = data$exc)
+    tmp <- data.frame(month=factor(months(as.POSIXct(data[,names$date]),TRUE), rev(month.abb)),
+                      exc = data[,names$exc])
     bwplot(month ~ exc, tmp, intervals = intervals,
     horizontal=TRUE, xscale.components = xscale.components.fi, scales=scales,
     panel=function(...) {
         panel.tmdlgrid(FALSE, intervals = intervals)
-        panel.bwplot.tmdl(..., box.width = .5)
+        panel.bwplot.tmdl(..., box.width = .5, stats = stats, coef = coef, do.out = do.out)
     })
 }
 
+mvstats <-
+function (data, names = list())
+{
+    names.default <- list(date = "date", exc = "exc")
+    names <- modifyList(names.default, names)
+    tmp <- data.frame(month=factor(months(as.POSIXct(data[,names$date]),TRUE), rev(month.abb)),
+                      exc = data[,names$exc])
+    tapply(tmp$exc, tmp$month, tmdl.stats)
+}
+
 panel.bwplot.tmdl <-
-function (x, y, horizontal, ...)
+function (x, y, horizontal, coef=.1, do.out=FALSE, ...)
 {
     ps.orig <- ps <- trellis.par.get("plot.symbol")
     ps$pch <- 8
     ps$cex <- .5
     trellis.par.set("plot.symbol", ps)
-    panel.bwplot(x, y, horizontal, pch="|", cex=0.5, ..., stats = tmdl.stats)
+    panel.bwplot(x, y, horizontal, pch="|", cex=0.5, ..., coef=coef, stats = tmdl.stats, do.out=do.out)
     trellis.par.set("plot.symbol", ps.orig)
     if (horizontal) {
         xx <- tapply(x, y, function(x) mean(x, na.rm = TRUE))
@@ -131,7 +153,7 @@ function (y = TRUE, intervals)
 # shall geometric mean be calculated for pollutants?
 # exp(mean(log(x)))
 rankflow <-
-function (data, pol, names = list(), sort = TRUE, method = "linear")
+function (data, pol, names = list(date="date"), pol.date = names$date, sort = TRUE, method = "linear")
 {
     names.default <- list(cfs = "cfs", date = "date")
     names <- modifyList(names.default, names)
@@ -146,11 +168,11 @@ function (data, pol, names = list(), sort = TRUE, method = "linear")
 
     # same thing with pollutant data if supplied separately
     if (!missing(pol)) {
-        day <- as.character(trunc(pol[, names$date], units = "days"))
+        day <- as.character(trunc(pol[, pol.date], units = "days"))
         columns <- which(sapply(pol, is.numeric))
         pol.daily <- aggregate(subset(pol, select = columns),
             by = list(date = day), FUN = "mean")
-        data.daily = merge(data.daily, pol.daily, by = names$date,
+        data.daily = merge(data.daily, pol.daily, by = "date",
             all.x = TRUE, sort = FALSE)
     }
 
@@ -182,7 +204,7 @@ function (object)
 {
 #    print("world")
 #    NextMethod("summary")
-    out <- as.data.frame(t(sapply(object$stats, function(x) x$stats[5])))
+    out <- as.data.frame(t(sapply(object$stats, function(x) ifelse(is.null(x),NA, x$stats[5]))))
     out <- rbind(out, object$MOS, object$TMDL, object$WLA, object$LA)
 #    out <- data.frame('q90' = sapply(object$stats, function(x) x$stats[5]))
     rownames(out) <- c('90th','MOS','TMDL','WLA','LA')
@@ -200,7 +222,7 @@ function (object)
 # FALSE to skip MOS
 # FIXME: MS4 WLA???
 tmdl <-
-function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 0, MOS = TRUE, intervals = fi)
+function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = NA, MOS = TRUE, intervals = fi)
 {
     names.default <- list(cfs = "cfs", exc = "exc", pol = "pol")
     names <- modifyList(names.default, names)
@@ -216,13 +238,13 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
         TMDL.breaks <- targetfun(intervals$breaks)
         MOS <- TMDL.mids - TMDL.breaks
         MOS.len <- length(MOS)
-        if (diff(tail(MOS,2))> 0 )
-            MOS[MOS.len] <- MOS[MOS.len - 1]    # skewed for low flows
+#        if (diff(tail(MOS,2))> 0 )
+        MOS[MOS.len] <- TMDL.mids[MOS.len] * MOS[MOS.len - 1] / TMDL.mids[MOS.len - 1]    # skewed for low flows, use same percentage as previous
     } else if (is.numeric(MOS)) {
         MOS <- TMDL.mids * MOS
     }
 
-    LA <- TMDL.mids - MOS - WLA
+    LA <- TMDL.mids - MOS - ifelse(is.na(WLA),0,WLA)
 
     # for box & whiskers plot
     sub <- subset(mydata, !is.na(load), c(names$cfs, names$exc, 'load'))
@@ -241,11 +263,11 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
 
 # original boxplot.stats https://svn.r-project.org/R/trunk/src/library/grDevices/R/calc.R
 tmdl.stats <-
-function (x, coef = 1.5, do.conf = TRUE, do.out = TRUE)
+function (x, coef = .1, do.conf = TRUE, do.out = TRUE)
 {
     nna <- !is.na(x)
     n <- sum(nna)                       # including +/- Inf
-    stats <- quantile(x, c(.1,.25,.5,.75,.9), na.rm = TRUE, names = FALSE)
+    stats <- quantile(x, c(coef,.25,.5,.75,1-coef), na.rm = TRUE, names = FALSE)
     out <- x < stats[1] | x > stats[5]
     iqr <- diff(stats[c(2, 4)])
     conf <- if(do.conf) stats[3L] + c(-1.58, 1.58) * iqr / sqrt(n)
