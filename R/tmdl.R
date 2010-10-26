@@ -32,12 +32,12 @@ function (data, names = list(), values = FALSE, type = "l", scales = list(), xla
 plot <- function(...)
     UseMethod("plot")
 
-# TODO: check if default 1.5 IQR for whiskers is close to 10th and 90th percentiles used in TMDL
-# may need to provide custom stats instead of boxplot.stats for that
 ldplot <-
 function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = NA, intervals = fi, coef = .1, do.out = FALSE,
-    xlab = "Flow Duration Interval (%)", ylab = "Load", key = list(), scales = list(), ...)
+    xlab = "Flow Duration Interval (%)", ylab = "Load", key = list(), scales = list(), plot = list(), ...)
 {
+    plot.default <- list(MOS = FALSE, WLA = FALSE)
+    plot <- modifyList(plot.default, plot)
     names.default <- list(Q = "Q", exc = "exc", pol = "pol")
     names <- modifyList(names.default, names)
     mydata <- subset(data, select = c(names$exc, names$Q))
@@ -49,16 +49,27 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
     sub$grp <- factor(grpfun(sub[, names$exc]), intervals$mids)
     ylim <- range(mydata$target[mydata$target>0], sub$load[sub$load>0], na.rm = TRUE) * c(0.8, 1.2)
     if (missing(key)) {
-        key.df <- data.frame(lab=c("LC", "Measured", "WLA"),
-                             col=c("darkgreen", "#ff00ff", "red"),
-                             lty=c(1,0,1),
-                             pch=c(NA,1,NA),
+        len <- length(rownames(WLA))
+        WLA.names <- rownames(WLA)
+        if (len == 0) {
+            len <- 1
+            WLA.names = "WLA"
+        } else if (len>1)
+            WLA.names[-1] <- paste('+',WLA.names[-1])
+        col <- trellis.par.get("superpose.line")$col
+        key.df <- data.frame(lab=c("Measured", "LC", "MOS", WLA.names),
+                             col=col[2:(len+4)],#c("#ff00ff", "darkgreen", "red"),
+                             lty=c(0,1,1,rep(1,len)),
+                             pch=c(1,NA,NA,rep(NA,len)),
                              stringsAsFactors = FALSE)
-        key.out <- key.df[2,]
+        key.out <- key.df[1,]
         if (!is.na(target))
-            key.out <- rbind(key.out, key.df[1,])
-        if (!is.na(WLA))
+            key.out <- rbind(key.out, key.df[2,])
+        if (plot$MOS)
             key.out <- rbind(key.out, key.df[3,])
+        if (plot$WLA & (is.numeric(WLA) | is.matrix(WLA) | is.data.frame(WLA)))
+            key.out <- rbind(key.out, key.df[1:len+3,])
+        key.out$col <- col[1+1:length(key.out$col)] # temporary quick fix
         key <- list(lines = list(col = key.out$col, lty = key.out$lty),
                             points = list(col = key.out$col, pch = key.out$pch),
                             text = list(lab = key.out$lab),
@@ -67,7 +78,7 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
     scales.default <- list(y = list(log = 10), x = list(alternating = 3, cex = c(1, 0.7)))
     scales <- modifyList(scales.default, scales)
     bwplot(load ~ grp, sub, scales = scales, mydata = mydata, mysub = sub, names = names, WLA = WLA, coef = coef, do.out = do.out,
-        xscale.components = xscale.components.fi, intervals = intervals,
+        xscale.components = xscale.components.fi, intervals = intervals, plot = plot, ...,
         yscale.components = yscale.components.log10ticks, ylim = ylim,
         key = key, xlim = c(-5, 105), xlab = xlab, ylab = ylab,
         panel = panel.ld)
@@ -77,7 +88,7 @@ plot.tmdl <-
 function (tmdl, ...)
 {
 #    warning("Unimplemented")
-    ldplot(tmdl$data, tmdl$names, tmdl$mult, WQS = tmdl$WQS, WLA = tmdl$WLA, ...)
+    ldplot(tmdl$data, tmdl$names, tmdl$mult, WQS = tmdl$WQS, WLA = tmdl$WLA, MOS.fun = tmdl$MOS.fun, WLA.fun = tmdl$WLA.fun, ...)
 }
 
 # monthly variation plot
@@ -138,28 +149,32 @@ function (x, y, horizontal, ..., stats = tmdl.stats, coef = .1, do.out = FALSE)
 }
 
 panel.ld <-
-function(x, ..., mydata, names, WLA, intervals)
+function(x, ..., mydata, names, WLA, intervals, plot, MOS.fun, WLA.fun)
 {
     panel.tmdlgrid(TRUE, intervals = intervals)
-    if (FALSE) {
-    nz <- mydata[mydata$target>0,]
-    idx <- which.min(nz$target)
-#    xx <- c(intervals$mids, nz[idx,'exc'])
-#    yy <- c(as.numeric(WLA[1,]), nz[idx,'target'])
-    xx <- intervals$mids
-    yy <- log10(as.numeric(WLA[1,]))
-    xxd <- diff(xx,lag=2)
-    yyd <- diff(yy,lag=2)
-    m <- c(-.01,yyd/xxd,0)
-    f <- splinefunH(xx,yy,m)            # Catmull-Rom spline
-    xxx=0:100
-    xy <- f(xxx)
-#    xy <- spline(xx,log10(yy),n=50,xmin=0,xmax=100)
-#    panel.points(xx,yy,col="green")
-    panel.lines(xy)
+    col <- trellis.par.get("superpose.line")$col
+    col.idx <- 3
+    panel.lines(mydata[, names$exc], log10(mydata$target), col = col[col.idx])
+    if (plot$MOS & !missing(MOS.fun)) {
+        col.idx <- col.idx + 1
+        panel.lines(0:100, log10(MOS.fun(0:100)), col=col[col.idx])
     }
-    panel.abline(h = log10(WLA), col = "red", lwd = 1.5)
-    panel.lines(mydata[, names$exc], log10(mydata$target), col = "darkgreen")# , col = key$lines$col[1])
+    if (plot$WLA) {
+        col.idx <- col.idx + 1
+        if (is.numeric(WLA))
+            panel.abline(h = log10(WLA), col = col[col.idx], lwd = 1.5)
+        else if (!missing(WLA.fun)) {
+            xx <- 0:100
+            yy <- sapply(WLA.fun, function(f) f(xx))
+            if (length(WLA.fun)>1)
+                for (i in 2:length(WLA.fun))    # ugly cumulative sum
+                    yy[,i] = yy[,i] + yy[,i-1]
+            for (i in 1:length(WLA.fun)) {
+                panel.lines(xx,log10(yy[,i]), col = col[col.idx])
+                col.idx <- col.idx + 1
+            }
+        }
+    }
     panel.points(mydata[, names$exc], log10(mydata$load), col = "#ff00ff")#, col = key$points$col[1])
     panel.bwplot.tmdl(as.numeric(as.character(x)), box.width = 4, ...)
 }
@@ -227,6 +242,16 @@ function (data, pol, names = list(date="date"), pol.date, sort = TRUE, method = 
     data.daily
 }
 
+# Smooth Catmull-Rom spline passing through control knots
+splineCR <-
+function(x,y)
+{
+    xd <- diff(x,lag=2)
+    yd <- diff(y,lag=2)
+    m <- c(0,yd/xd,0)
+    splinefunH(x,y,m)
+}
+
 summary.tmdl <-
 function (object)
 {
@@ -249,39 +274,66 @@ function (object)
 
 # MOS can be
 # TRUE to calculate as difference between median and low flow in each zone
-# percentage as between 0 and 1
+# percentage as between 0 and 1. Can be given for each zone individually.
 # FALSE to skip MOS
 # FIXME: MS4 WLA???
 tmdl <-
-function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = NA, MOS = TRUE, intervals = fi)
+function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = NA, MOS = TRUE, intervals = fi, interp = "spline")
 {
     names.default <- list(Q = "Q", exc = "exc", pol = "pol")
     names <- modifyList(names.default, names)
     mydata <- subset(data, select = c(names$exc, names$Q, names$pol)) # FIXME: remove names$pol in the future. Used in current ldplot.tmdl only
-    mydata$target <- mydata[, names$Q] * target * mult
     mydata$load <- mydata[, names$Q] * data[, names$pol] * mult
     mydata$grp <- factor(grpfun(mydata[, names$exc]), intervals$mids)
+    TMDL.mids <- NULL
+    LA <- NULL
+    MOS.fun <- NULL
+    WLA.fun <- NULL
+    if (!is.na(target)) {
+        mydata$target <- mydata[, names$Q] * target * mult
 
-    targetfun <- approxfun(mydata$exc, mydata$target)
-    TMDL.mids <- targetfun(intervals$mids)
+        target.fun <- approxfun(mydata$exc, mydata$target)
+        TMDL.mids <- target.fun(intervals$mids)
 
-    if (is.logical(MOS) & MOS) {
-        TMDL.breaks <- targetfun(intervals$breaks)
-        MOS <- TMDL.mids - TMDL.breaks
-        MOS.len <- length(MOS)
-        MOS[MOS.len] <- TMDL.mids[MOS.len] * MOS[MOS.len - 1] / TMDL.mids[MOS.len - 1]    # skewed for low flows, use same percentage as previous
-    } else if (is.numeric(MOS)) {
-        MOS <- TMDL.mids * MOS
+        if (is.logical(MOS) & MOS[1]) {     # we check only first (the only?) element
+            TMDL.breaks <- target.fun(intervals$breaks)
+            MOS <- TMDL.mids - TMDL.breaks
+            MOS.len <- length(MOS)
+            MOS[MOS.len] <- TMDL.mids[MOS.len] * MOS[MOS.len - 1] / TMDL.mids[MOS.len - 1]    # skewed for low flows, use same percentage as previous
+        } else if (is.numeric(MOS)) {
+            MOS <- TMDL.mids * MOS          # should work fine for vector of same length
+        }
+
+        MOSpct.fun <- splineCR(intervals$mids, MOS/TMDL.mids)            # Catmull-Rom spline
+                                        #    MOSpct.fun <- approxfun(intervals$mids, MOS/TMDL.mids, rule = 2) # linear % of LC, extrapolate as end values
+        MOS.fun <- function(x) target.fun(x) * MOSpct.fun(x)
+
+        env <- environment()  # neccesary to adjust available LA for each WLA
+        LA <- TMDL.mids - MOS               # LA available for distribution at the moment
+                                        # TODO: add case for WLA as a list(?) of user functions
+        WLA.fun <- NULL                     # otherwise WLA.fun would be defined within `if` block only
+        if (is.matrix(WLA) | is.data.frame(WLA) | is.numeric(WLA)) {
+            WLA.mtx <- NULL
+            if (is.numeric(WLA))
+                WLA.mtx <- matrix(WLA, ncol = 5, dimnames = list("WLA"))
+            else
+                WLA.mtx <- as.matrix(WLA)#, dimnames=list(WLA=rownames(WLA)))
+            if (is.null(rownames(WLA.mtx))) # shouldn't get several unnamed rows
+                rownames(WLA.mtx) = "WLA"
+            WLA.fun <- sapply(rownames(WLA.mtx),
+                              function(name) {
+                                  assign("LA", LA - WLA.mtx[name,], env) # this effectively reduces available LA in parent environment
+                                  switch(interp,
+                                         spline = {
+                                        #pct.fun <- approxfun(intervals$mids, WLA.mtx[name,]/TMDL.mids, rule = 2) # % of LC
+                                             pct.fun <- splineCR(intervals$mids, WLA.mtx[name,]/TMDL.mids)
+                                             function(x) pct.fun(x) * target.fun(x)
+                                         },
+                                         linear = function(x) 10^approx(intervals$mids, log10(WLA.mtx[name,]), x, rule = 2)$y
+                                         )
+                              })
+        }
     }
-
-    LA <- TMDL.mids - MOS
-    WLA.sum <- WLA
-    if (length(WLA)==1)
-        WLA.sum <- rep(WLA.sum, 5)
-    WLA.sum <- as.matrix(WLA.sum, cols=5)
-    WLA.sum <- colSums(WLA.sum, na.rm = TRUE)
-    LA <- LA - WLA.sum
-
     # for box & whiskers plot
     sub <- subset(mydata, !is.na(load), c(names$Q, names$exc, 'load'))
     sub$grp <- factor(grpfun(sub[, names$exc]), intervals$mids)
@@ -290,7 +342,7 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
 
     out <- list(data = mydata, stats = blist, names = names,
                 WQS = target, mult = mult,
-                WLA = WLA, MOS = MOS, LC = TMDL.mids, LA = LA)
+                WLA = WLA, MOS = MOS, LC = TMDL.mids, LA = LA, MOS.fun = MOS.fun, WLA.fun = WLA.fun)
     class(out) <- "tmdl"
     out
 }
