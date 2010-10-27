@@ -1,84 +1,104 @@
+% Experimental for WLA.fun
 \documentclass{article}
-\usepackage[T1]{fontenc}
-\usepackage{ae}
+\usepackage{fullpage}
 %\def\pgfsysdriver{pgfsys-tex4ht.def} 
 \usepackage{tikz}
+\pgfrealjobname{vignette}
+\usepackage{indentfirst}
+\usepackage[nogin]{Sweave}
+\SweaveOpts{cache=TRUE,external=TRUE,echo=TRUE,width=6,height=4}
+\usepackage{times}
+\usepackage[colorlinks]{hyperref}
+\usepackage[figure]{hypcap}
+
+\ifpdf
+\hypersetup{
+	pdfauthor = {Mikhail Titov},
+	pdftitle = {Duration curves},
+	pdfsubject = {Duration Curves},
+	pdfkeywords = {TMDL, Knife River}
+}
+\fi
 
 \begin{document}
+\fvset{listparameters={\setlength{\topsep}{0pt}}}
+\renewenvironment{Schunk}{\vspace{\topsep} \scriptsize}{\vspace{\topsep}}
 
-Load data
-
-<<load>>=
-# data from USGS gage 
-#require(tmdl)
-library(latticeExtra)
-source('../R/tmdl.R')
-#file <- file.path(.path.package('tmdl'), 'data', 'USGS_04015330_Knife_River.txt')
-x <- read.table('c:/workspace/tmdl/pkg/data/USGS_04015330_Knife_River.txt', skip=29, as.is=TRUE)
-names(x)  <-  c("agency", "site", "date", "cfs", "status")
-x$agency <- NULL
-x$site <- NULL
-x$status <- NULL
-x$cfs[x$cfs=='Ice'] <- NA
-x$cfs <- as.numeric(x$cfs)
-x$date <- as.POSIXct(x$date, format="%Y-%m-%d")
-pol=read.csv('c:/workspace/tmdl/pkg/data/water_chemistry_data_02026001_1974-07-01_2010-10-07.csv')
-pol$date = as.POSIXct(pol$Timestamp)
-pol$Timestamp = NULL
+<<setup,echo=FALSE>>=
+library(tmdl)
+#source("../../tmdl/pkg/R/tmdl.R")
+options(SweaveHooks=list(
+        fig=function() {
+            par(mar=c(2.7,2.5,1,.5),
+                mgp=c(1.5,0.5,0) )} ))
+options(width=130)#,digits=3)
+tp=trellis.par.get('par.ylab.text')
+tp$cex=.4
+trellis.par.set('par.ylab.text',tp)
+trellis.par.set('par.xlab.text',tp)
+lw <- list(left.padding = list(x = 0.05, units = "inches"),
+           right.padding = list(x = -0.05, units = "inches"))
+lh <- list(bottom.padding = list(x = 0, units = "inches"),
+           top.padding = list(x = -0.15, units = "inches"))
+lattice.options(layout.widths = lw, layout.heights = lh)
 @
-
-First rows are
 
 <<usgs>>=
-head(x,31)
-head(pol)
+data(flow)
+data(pol)
+flow.ranked <- rankflow(flow,pol,names=list(date="Date",Q="cfs"))
+fd.fig <- fdplot(flow.ranked,names=list(Q="cfs"),values=TRUE)
+WQS <- 5 # mg/L => 10 NTU
+WLA.construction = function(exc,LC,MOS,LC.fun,MOS.fun) {
+  LA = ifelse(exc>75, LC.fun(75)-MOS.fun(75), LC - MOS)
+  .01 * LA
+}
+MS4.Duluth = function(exc,LC,MOS,LC.fun,MOS.fun) {
+  .16 * (LC-MOS-WLA.construction(exc,LC,MOS,LC.fun,MOS.fun))
+}
+WLA=list(WLA=WLA.construction, MS4=MS4.Duluth)
+kr.tmdl <- tmdl(flow.ranked,names=list(Q="cfs",pol="TSS"),WQS=WQS, WLA=WLA)
+summary(kr.tmdl)
+ld.fig <- plot(kr.tmdl, ylab=expression(paste("Load , ",over(kg,day))),plot=list(WLA=TRUE))
+mv.fig <- mvplot(flow.ranked)
+
+ld2.fig <- update(ld.fig, par.settings=theEconomist.theme())
 @
 
-Now calculate exceedance
-<<exc>>=
-z <- rankflow(x,pol)
-turb2tss <- function(x) 10^(0.920*log10(x)-0.230)
+\begin{figure}[h!tbp]
+  \centering
+<<usgs_fig,fig=TRUE,sanitize=TRUE>>=
+plot(fd.fig)
 @
-
-Monthly flow variation with legend
-
-<<mv>>=
-mv <- mvplot(z)
-key = list(text=list(lab=c("Date range",paste(range(z$date),collapse=" -- "))),space = "bottom")
-mv=update(mv, key=key)
-@
-
-\begin{figure}
-\centering
-<<mv_fig,fig=TRUE,sanitize=FALSE>>=
-plot(mv)
-@
-\caption{Exceedance by month}
+\caption{Flow duration based on USGS}
+\label{fig:fd}
 \end{figure}
 
-\begin{figure}
-\centering
-<<fd,fig=TRUE,sanitize=FALSE>>=
-fd <- fdplot(z, ylab=list("Flow (cfs)", cex=1.5, col='red'), main="USGS gage 04015330")
-plot(fd)
-@
-\caption{Flow duration}
-\end{figure}
-
-TMDL in essense
-
-<<tmdl>>=
-tmdl1 <- tmdl(z, names=list(pol="TSS..mg.L."), target = turb2tss(10), MOS=FALSE)
-summary(tmdl1)
-@
-
-\begin{figure}
-\centering
-<<ld,fig=TRUE,sanitize=FALSE>>=
-ld <- ldplot(tmdl1)
-plot(ld)
+\begin{figure}[h!tbp]
+  \centering
+<<ld_fig,fig=TRUE,sanitize=TRUE>>=
+plot(ld.fig)
 @
 \caption{Load duration}
+\label{fig:ld}
+\end{figure}
+
+\begin{figure}[h!tbp]
+  \centering
+<<mv_fig,fig=TRUE,sanitize=TRUE>>=
+plot(mv.fig)
+@
+\caption{Monthly variation}
+\label{fig:mv}
+\end{figure}
+
+\begin{figure}[h!tbp]
+  \centering
+<<ld2_fig,fig=TRUE,sanitize=TRUE>>=
+plot(ld2.fig)
+@
+\caption{Load duration with custom theme}
+\label{fig:ld2}
 \end{figure}
 
 \end{document}

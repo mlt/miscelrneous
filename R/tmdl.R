@@ -29,12 +29,12 @@ function (data, names = list(), values = FALSE, type = "l", scales = list(), xla
         })
 }
 
-plot <- function(...)
-    UseMethod("plot")
+#plot <- function(...)
+#    UseMethod("plot")
 
 ldplot <-
 function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = NA, intervals = fi, coef = .1, do.out = FALSE,
-    xlab = "Flow Duration Interval (%)", ylab = "Load", key = list(), scales = list(), plot = list(), ...)
+    xlab = "Flow Duration Interval (%)", ylab = "Load", key = NULL, legend = NULL, scales = list(), plot = list(), ...)
 {
     plot.default <- list(MOS = FALSE, WLA = FALSE)
     plot <- modifyList(plot.default, plot)
@@ -44,51 +44,60 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
     mydata$target <- mydata[, names$Q] * target * mult
     mydata$load <- mydata[, names$Q] * data[, names$pol] * mult
     # for box & whiskers plot
-    sub <- subset(mydata, !is.na(load),
-                  c(names$Q, names$exc, 'load'))
+    sub <- subset(mydata, !is.na(load), c(names$Q, names$exc, 'load'))
     sub$grp <- factor(grpfun(sub[, names$exc]), intervals$mids)
     ylim <- range(mydata$target[mydata$target>0], sub$load[sub$load>0], na.rm = TRUE) * c(0.8, 1.2)
-    if (missing(key)) {
-        len <- length(rownames(WLA))
-        WLA.names <- rownames(WLA)
-        if (len == 0) {
-            len <- 1
-            WLA.names = "WLA"
-        } else if (len>1)
-            WLA.names[-1] <- paste('+',WLA.names[-1])
-        col <- trellis.par.get("superpose.line")$col
-        key.df <- data.frame(lab=c("Measured", "LC", "MOS", WLA.names),
-                             col=col[2:(len+4)],#c("#ff00ff", "darkgreen", "red"),
-                             lty=c(0,1,1,rep(1,len)),
-                             pch=c(1,NA,NA,rep(NA,len)),
-                             stringsAsFactors = FALSE)
-        key.out <- key.df[1,]
-        if (!is.na(target))
-            key.out <- rbind(key.out, key.df[2,])
-        if (plot$MOS)
-            key.out <- rbind(key.out, key.df[3,])
-        if (plot$WLA & (is.numeric(WLA) | is.matrix(WLA) | is.data.frame(WLA)))
-            key.out <- rbind(key.out, key.df[1:len+3,])
-        key.out$col <- col[1+1:length(key.out$col)] # temporary quick fix
-        key <- list(lines = list(col = key.out$col, lty = key.out$lty),
-                            points = list(col = key.out$col, pch = key.out$pch),
-                            text = list(lab = key.out$lab),
-                            corner=c(1,1), background="white", padding.text = 3)
-    }
+    if (missing(legend) & missing(key))
+        legend <- list(inside = list(args = list(target = target, WLA = WLA, plot = plot), fun = ldplot.legend, corner = c(1,1)))
     scales.default <- list(y = list(log = 10), x = list(alternating = 3, cex = c(1, 0.7)))
     scales <- modifyList(scales.default, scales)
+#    print(do.call(legend$inside$fun,args=legend$inside$args))
     bwplot(load ~ grp, sub, scales = scales, mydata = mydata, mysub = sub, names = names, WLA = WLA, coef = coef, do.out = do.out,
         xscale.components = xscale.components.fi, intervals = intervals, plot = plot, ...,
         yscale.components = yscale.components.log10ticks, ylim = ylim,
-        key = key, xlim = c(-5, 105), xlab = xlab, ylab = ylab,
+        key = key, legend = legend, xlim = c(-5, 105), xlab = xlab, ylab = ylab,
         panel = panel.ld)
 }
 
+ldplot.key <-
+function(target, WLA, plot)
+{
+    len <- length(rownames(WLA))
+    WLA.names <- rownames(WLA)
+    if (len == 0) {
+        len <- 1
+        WLA.names = "WLA"
+    } else if (len>1)
+        WLA.names[-1] <- paste('+', WLA.names[-1])
+    data <- data.frame(Rows(trellis.par.get("superpose.symbol"), 2), stringsAsFactors = FALSE)
+    data[c("lty", "lwd")] <- 0
+    data$lab <- "Measured"
+    names <- c()
+    if (!is.na(target))
+        names <- c(names, "LC")
+    if (plot$MOS)
+        names <- c(names, "MOS")
+    if (plot$WLA)
+        names <- c(names, WLA.names)
+    lines <- as.data.frame(Rows(trellis.par.get("superpose.line"), 2+1:length(names)))
+    lines[c("cex", "fill", "font", "pch")] <- NA
+    lines$lab <- names
+    data <- rbind(data, lines)
+    list(lines = list(alpha = data$alpha, col = data$col, lty = data$lty, lwd = data$lwd),
+                points = list(alpha = data$alpha, col = data$col, fill = data$fill, font = data$font, pch = data$pch),
+                text = list(lab = data$lab),
+                corner=c(1,1), background="transparent", padding.text = 3)
+}
+
+ldplot.legend <-
+function(...)
+    draw.key(ldplot.key(...))
+
 plot.tmdl <-
-function (tmdl, ...)
+function (x, ...)
 {
 #    warning("Unimplemented")
-    ldplot(tmdl$data, tmdl$names, tmdl$mult, WQS = tmdl$WQS, WLA = tmdl$WLA, MOS.fun = tmdl$MOS.fun, WLA.fun = tmdl$WLA.fun, ...)
+    ldplot(x$data, x$names, x$mult, WQS = x$WQS, WLA = x$WLA, MOS.fun = x$MOS.fun, WLA.fun = x$WLA.fun, ...)
 }
 
 # monthly variation plot
@@ -152,17 +161,23 @@ panel.ld <-
 function(x, ..., mydata, names, WLA, intervals, plot, MOS.fun, WLA.fun)
 {
     panel.tmdlgrid(TRUE, intervals = intervals)
-    col <- trellis.par.get("superpose.line")$col
-    col.idx <- 3
-    panel.lines(mydata[, names$exc], log10(mydata$target), col = col[col.idx])
+    len <- 4
+    if (!missing(WLA.fun))
+        len <- len + length(WLA.fun)
+    lines <- Rows(trellis.par.get("superpose.line"),1:len) # guaranteed
+    line.idx <- 3
+    panel.lines(mydata[, names$exc], log10(mydata$target), # bug in lattice alpha having length 1?
+                alpha = lines$alpha, col = lines$col[line.idx], lty = lines$lty[line.idx], lwd = lines$lwd[line.idx])
     if (plot$MOS & !missing(MOS.fun)) {
-        col.idx <- col.idx + 1
-        panel.lines(0:100, log10(MOS.fun(0:100)), col=col[col.idx])
+        line.idx <- line.idx + 1
+        panel.lines(0:100, log10(MOS.fun(0:100)),
+                    alpha = lines$alpha, col = lines$col[line.idx], lty = lines$lty[line.idx], lwd = lines$lwd[line.idx])
     }
     if (plot$WLA) {
-        col.idx <- col.idx + 1
-        if (is.numeric(WLA))
-            panel.abline(h = log10(WLA), col = col[col.idx], lwd = 1.5)
+        line.idx <- line.idx + 1
+        if (is.numeric(WLA) & !is.matrix(WLA))
+            panel.abline(h = log10(WLA),
+                         alpha = lines$alpha, col = lines$col[line.idx], lty = lines$lty[line.idx], lwd = lines$lwd[line.idx])
         else if (!missing(WLA.fun)) {
             xx <- 0:100
             yy <- sapply(WLA.fun, function(f) f(xx))
@@ -170,12 +185,15 @@ function(x, ..., mydata, names, WLA, intervals, plot, MOS.fun, WLA.fun)
                 for (i in 2:length(WLA.fun))    # ugly cumulative sum
                     yy[,i] = yy[,i] + yy[,i-1]
             for (i in 1:length(WLA.fun)) {
-                panel.lines(xx,log10(yy[,i]), col = col[col.idx])
-                col.idx <- col.idx + 1
+                panel.lines(xx, log10(yy[,i]),
+                            alpha = lines$alpha, col = lines$col[line.idx], lty = lines$lty[line.idx], lwd = lines$lwd[line.idx])
+                line.idx <- line.idx + 1
             }
         }
     }
-    panel.points(mydata[, names$exc], log10(mydata$load), col = "#ff00ff")#, col = key$points$col[1])
+    symbol <- Rows(trellis.par.get("superpose.symbol"),2)
+    panel.points(mydata[, names$exc], log10(mydata$load),
+                 alpha = symbol$alpha, cex = symbol$cex, col = symbol$col, fill = symbol$fill, font = symbol$font, pch = symbol$pch)
     panel.bwplot.tmdl(as.numeric(as.character(x)), box.width = 4, ...)
 }
 
@@ -194,18 +212,17 @@ function (y = TRUE, intervals)
 # shall geometric mean be calculated for pollutants?
 # exp(mean(log(x)))
 rankflow <-
-function (data, pol, names = list(date="date"), pol.date, sort = TRUE, method = "linear")
+function (data, pol, names = list(date="date"), pol.date, sort = TRUE, method = "linear", mean = base::mean)
 {
     names.default <- list(Q = "Q", date = "date")
     names <- modifyList(names.default, names)
-    columns <- c(which(colnames(data) == names$date), which(sapply(data,
-        is.numeric)))
+    columns <- c(which(colnames(data) == names$date), which(sapply(data, is.numeric)))
     flow = data[!is.na(data[, names$Q]), columns]
 
     # daily flow averaged as well as daily averages of everything else that might be in data.frame
     day <- as.character(trunc(flow[, names$date], units = "days"))
-    data.daily <- aggregate(subset(flow, select = -1), by = list(date = day),
-        FUN = "mean")
+    data.daily <- aggregate(subset(flow, select = names$Q), by = list(date = day), FUN = base::mean)
+    pol.daily <- NULL
 
     # same thing with pollutant data if supplied separately
     if (!missing(pol)) {
@@ -214,10 +231,10 @@ function (data, pol, names = list(date="date"), pol.date, sort = TRUE, method = 
         day <- as.character(trunc(pol[, pol.date], units = "days"))
         columns <- which(sapply(pol, is.numeric))
         pol.daily <- aggregate(subset(pol, select = columns),
-            by = list(date = day), FUN = "mean")
-        data.daily = merge(data.daily, pol.daily, by = "date",
-            all.x = TRUE, sort = FALSE)
-    }
+                               by = list(date = day), FUN = mean)
+    } else
+        pol.daily <- aggregate(subset(flow, select = -c(1, which(names(flow)==names$Q))), by = list(date = day), FUN = mean)
+    data.daily = merge(data.daily, pol.daily, by = "date", all.x = TRUE, sort = FALSE)
 
     # flow ranking
     switch(tolower(method), pr = { # method 1 http://en.wikipedia.org/wiki/Percentile_rank
@@ -253,7 +270,7 @@ function(x,y)
 }
 
 summary.tmdl <-
-function (object)
+function (object,...)
 {
     out <- as.data.frame(t(sapply(object$stats, function(x) ifelse(is.null(x),NA, x$stats[5]))))
     WLA <- object$WLA
@@ -289,7 +306,7 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
     LA <- NULL
     MOS.fun <- NULL
     WLA.fun <- NULL
-    if (!is.na(target)) {
+    if (!is.na(target)) {               # without WQS all other calculations are meaningless
         mydata$target <- mydata[, names$Q] * target * mult
 
         target.fun <- approxfun(mydata$exc, mydata$target)
@@ -332,6 +349,13 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
                                          linear = function(x) 10^approx(intervals$mids, log10(WLA.mtx[name,]), x, rule = 2)$y
                                          )
                               })
+        } else if (is.list(WLA)) {      # should be list of functions for now
+            WLA.fun <- sapply(WLA, function(f) {
+                ff <- function(x) f(exc = x, LC = target.fun(x), MOS = MOS.fun(x), LC.fun = target.fun, MOS.fun = MOS.fun)
+                invisible(ff(2))       # without it function is being replaced TODO: ask on the mailing list
+                ff
+            })
+            WLA <- t(sapply(WLA.fun, function(f) f(intervals$mids)))
         }
     }
     # for box & whiskers plot
@@ -340,11 +364,11 @@ function (data, names = list(), mult = 2.446576, WQS = 0.1, target = WQS, WLA = 
     blist <- tapply(sub$load, sub$grp, tmdl.stats)
     names(blist) <- fi$labels
 
-    out <- list(data = mydata, stats = blist, names = names,
+    obj <- list(data = mydata, stats = blist, names = names,
                 WQS = target, mult = mult,
                 WLA = WLA, MOS = MOS, LC = TMDL.mids, LA = LA, MOS.fun = MOS.fun, WLA.fun = WLA.fun)
-    class(out) <- "tmdl"
-    out
+    class(obj) <- c("tmdl", class(obj))
+    obj
 }
 
 # original boxplot.stats https://svn.r-project.org/R/trunk/src/library/grDevices/R/calc.R

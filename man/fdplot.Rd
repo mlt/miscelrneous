@@ -1,41 +1,39 @@
 \name{fdplot}
-%\alias{load}
+\alias{fdplot}
 \title{Plots Flow Duration Curve}
 \description{
-This function produces grob with FDC given
+This function produces "trellis" object with FDC given
 prepared flow and pollutant data.
 %Reload  the  datasets  written  to  a  file  with  the  function
 %\code{save}.
 }
 \usage{
-fdplot (data, names = list(), type, scales = list(), xlab = "Flow Duration Interval (%)",
-    ylab, ...)
+fdplot (data, names =list(), values = FALSE, type = "l", scales = list(),
+xlab = "Flow Duration Interval (\%)", ylab, intervals = fi, ...)
 }
 \arguments{
-\item{data}{a  data frame typically with columns date, cfs, exc, pol.
- Those can be overriden using \code{names}}
-\item{names}{List that can specify custom names for date, cfs, and pol}
-\item{...}{Other parameters are passed to \code{lattice::xyplot}}
+\item{data}{Typically result of \code{\link{rankflow}}, a \code{\link{data.frame}} with columns "Q" & "exc".
+ Those can be overriden using \var{names}}
+\item{names}{List that can specify custom column names in
+  data frame \var{data} for \var{Q} and \var{exc}}
+\item{values}{Show flow rate at intervals boundaries}
+
+See \code{\link[lattice]{xyplot}} for these
+\item{type}{}
+\item{scales}{}
+\item{xlab}{}
+\item{ylab}{}
+\item{...}{}
+\item{intervals}{Non-standard flow intervals definitions (currently broken)}
 }
 \seealso{
 \code{\link{rankflow}}.
 }
 \examples{
-# data from USGS gage 
-#require(tmdl)
-library(latticeExtra)
-source('../R/tmdl.R')
-#file <- file.path(.path.package('tmdl'), 'data', 'USGS_04015330_Knife_River.txt')
-x <- read.table('c:/workspace/tmdl/pkg/data/USGS_04015330_Knife_River.txt', skip=29, as.is=TRUE)
-names(x)  <-  c("agency", "site", "date", "cfs", "status")
-x$agency <- NULL
-x$site <- NULL
-x$status <- NULL
-x$cfs[x$cfs=='Ice'] <- NA
-x$cfs <- as.numeric(x$cfs)
-x$date <- as.POSIXct(x$date, format="%Y-%m-%d")
-z <- rankflow(x)
-fig <- fdplot(z, ylab=list("Flow (cfs)", cex=1.5, col='red'), main="USGS gage 04015330")
-plot(fig)
+data(flow)
+data(pol)
+ranked <- rankflow(flow, pol, names = list(date="Date", Q="cfs"))
+options(digits=4) # can limit number of digits on plot value labels
+fdplot(ranked, names=list(Q="cfs"), values=TRUE)
 }
-\keyword{data}
+

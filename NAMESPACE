@@ -1,3 +1,4 @@
 export(fdplot,ldplot,ldplot,mvplot,mvstats,plot.tmdl,rankflow,summary.tmdl,tmdl,tmdl.stats)
 import(lattice,latticeExtra)
 S3method(plot,tmdl)
+S3method(summary,tmdl)
