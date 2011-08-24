@@ -1,0 +1,9 @@
+Package: miscelrneous
+Title: Miscelaneous functions
+Version: 0.1
+Date: 2011-08-18
+Author: Mikhail Titov
+Maintainer: Mikhail Titov <mlt@gmx.us>
+Description: Some common functions I use once in a while.
+License: GPL-3
+Collate: 'cut.spec.R' 'panel.grid.log.R' 'plot.spec.R' 'spec.ls.R'
