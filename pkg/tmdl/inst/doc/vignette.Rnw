@@ -1,0 +1,104 @@
+% Experimental for WLA.fun
+\documentclass{article}
+\usepackage{fullpage}
+%\def\pgfsysdriver{pgfsys-tex4ht.def} 
+\usepackage{tikz}
+\pgfrealjobname{vignette}
+\usepackage{indentfirst}
+\usepackage[nogin]{Sweave}
+\SweaveOpts{cache=TRUE,external=TRUE,echo=TRUE,width=6,height=4}
+\usepackage{times}
+\usepackage[colorlinks]{hyperref}
+\usepackage[figure]{hypcap}
+
+\ifpdf
+\hypersetup{
+	pdfauthor = {Mikhail Titov},
+	pdftitle = {Duration curves},
+	pdfsubject = {Duration Curves},
+	pdfkeywords = {TMDL, Knife River}
+}
+\fi
+
+\begin{document}
+\fvset{listparameters={\setlength{\topsep}{0pt}}}
+\renewenvironment{Schunk}{\vspace{\topsep} \scriptsize}{\vspace{\topsep}}
+
+<<setup,echo=FALSE>>=
+library(tmdl)
+#source("../../tmdl/pkg/R/tmdl.R")
+options(SweaveHooks=list(
+        fig=function() {
+            par(mar=c(2.7,2.5,1,.5),
+                mgp=c(1.5,0.5,0) )} ))
+options(width=130)#,digits=3)
+tp=trellis.par.get('par.ylab.text')
+tp$cex=.4
+trellis.par.set('par.ylab.text',tp)
+trellis.par.set('par.xlab.text',tp)
+lw <- list(left.padding = list(x = 0.05, units = "inches"),
+           right.padding = list(x = -0.05, units = "inches"))
+lh <- list(bottom.padding = list(x = 0, units = "inches"),
+           top.padding = list(x = -0.15, units = "inches"))
+lattice.options(layout.widths = lw, layout.heights = lh)
+@
+
+<<usgs>>=
+data(flow)
+data(pol)
+flow.ranked <- rankflow(flow,pol,names=list(date="Date",Q="cfs"))
+fd.fig <- fdplot(flow.ranked,names=list(Q="cfs"),values=TRUE)
+WQS <- 5 # mg/L => 10 NTU
+WLA.construction = function(exc,LC,MOS,LC.fun,MOS.fun) {
+  LA = ifelse(exc>75, LC.fun(75)-MOS.fun(75), LC - MOS)
+  .01 * LA
+}
+MS4.Duluth = function(exc,LC,MOS,LC.fun,MOS.fun) {
+  .16 * (LC-MOS-WLA.construction(exc,LC,MOS,LC.fun,MOS.fun))
+}
+WLA=list(WLA=WLA.construction, MS4=MS4.Duluth)
+kr.tmdl <- tmdl(flow.ranked,names=list(Q="cfs",pol="TSS"),WQS=WQS, WLA=WLA)
+summary(kr.tmdl)
+ld.fig <- plot(kr.tmdl, ylab=expression(paste("Load , ",over(kg,day))),plot=list(WLA=TRUE))
+mv.fig <- mvplot(flow.ranked)
+
+ld2.fig <- update(ld.fig, par.settings=theEconomist.theme())
+@
+
+\begin{figure}[h!tbp]
+  \centering
+<<usgs_fig,fig=TRUE,sanitize=TRUE>>=
+plot(fd.fig)
+@
+\caption{Flow duration based on USGS}
+\label{fig:fd}
+\end{figure}
+
+\begin{figure}[h!tbp]
+  \centering
+<<ld_fig,fig=TRUE,sanitize=TRUE>>=
+plot(ld.fig)
+@
+\caption{Load duration}
+\label{fig:ld}
+\end{figure}
+
+\begin{figure}[h!tbp]
+  \centering
+<<mv_fig,fig=TRUE,sanitize=TRUE>>=
+plot(mv.fig)
+@
+\caption{Monthly variation}
+\label{fig:mv}
+\end{figure}
+
+\begin{figure}[h!tbp]
+  \centering
+<<ld2_fig,fig=TRUE,sanitize=TRUE>>=
+plot(ld2.fig)
+@
+\caption{Load duration with custom theme}
+\label{fig:ld2}
+\end{figure}
+
+\end{document}
