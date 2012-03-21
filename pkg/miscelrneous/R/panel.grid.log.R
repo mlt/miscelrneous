@@ -1,7 +1,7 @@
 ##' Panel function to draw correct grid on log-log plot
 ##'
 ##' <details>
-##' @title My title
+##' @title Nice log grid
 ##' @param base base of logarithm
 ##' @return Nothing
 ##' @author Mikhail Titov

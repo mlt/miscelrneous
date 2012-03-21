@@ -1,7 +1,7 @@
 ##' Panel function to add mean to bwplot
 ##'
 ##' <details>
-##' @title My title
+##' @title Panel function for means on bwplot
 ##' @param x
 ##' @param y
 ##' @param ...

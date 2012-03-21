@@ -18,3 +18,4 @@ Collate:
     'panel.mean.R'
     'read.rdb.USGS.R'
     'url.make.USGS.R'
+BuildVignettes: false

@@ -1,7 +1,7 @@
 ##' Read RDB database format from USGS
 ##'
 ##' .. content for \details{} ..
-##' @title read.rdb.USGS
+##' @title Read RDB (UNIX DB) files from USGS
 ##' @param f file or connection
 ##' @return \code{data.frame} with time series
 ##' @author Mikhail Titov

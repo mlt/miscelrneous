@@ -1,0 +1,8 @@
+export(ci.spec)
+export(cut.spec)
+export(panel.grid.log)
+export(panel.mean)
+export(plot.spec)
+export(read.rdb.USGS)
+export(spec.ls)
+export(url.make.USGS)

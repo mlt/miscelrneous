@@ -1,7 +1,7 @@
 ##' Generates URL to fetch water data from USGS
 ##'
 ##' Generates URL to fetch water data from USGS web site \url{http://nwis.waterdata.usgs.gov/nwis}
-##' @title url.make.USGS
+##' @title Forms URL to fetch water data from USGS
 ##' @param uri URI list with at least path component
 ##' @param form list with GET form parameters
 ##' @return string representing url and suitable for use in corresponding function to create a connection
