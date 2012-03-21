@@ -1,0 +1,50 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\SweaveOpts{sanitize=TRUE,highlight=TRUE}
+
+\begin{document}
+
+Load package. Set up query fields. Get URL.
+
+@
+<<step1>>=
+library(miscelrneous)
+library(lattice)
+begin_date <- ISOdate(2011,03,21)
+end_date <- ISOdate(2012,03,19)
+l <- list(
+          site_no="05355200",
+#          multiple_site_no="05355200",
+          cb_00060="on",
+          format="rdb",
+          begin_date=format(begin_date,"%Y-%m-%d"),
+          end_date=format(end_date,"%Y-%m-%d")
+          )
+myurl <- url.make.USGS(list(path="nwis/dv"), l)
+myurl
+@ %def
+
+Open connection to web server. Read data.
+
+@
+<<step2>>=
+#f <- file("USGS_05355200.rdb")
+f <- url(myurl)
+x <- read.rdb.USGS(f)
+head(x)
+@ %def
+
+
+Plot it.
+
+@
+<<step3,fig=T>>=
+p <- xyplot(X04_00060_00003~datetime,x,type="o",
+            groups=X04_00060_00003_cd,
+            auto.key=TRUE
+            )
+plot(p)
+@ %def
+
+\end{document}
