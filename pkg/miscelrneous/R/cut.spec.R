@@ -5,6 +5,7 @@
 ##' @param s spec object as returned by spec.ls or alike
 ##' @return data.frame with period, freq, psd, and sd
 ##' @author Mikhail Titov
+##' @export
 cut.spec <- function(s) {
     period.rng <- log2(range(1/s$freq))
     n <- ceiling(diff(period.rng))           # number of octaves, i.e. freq

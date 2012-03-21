@@ -20,6 +20,7 @@
 ##' @references
 ##' [1] N. R. Lomb, "Least-squares frequency analysis of unequally spaced data," Astrophysics and space science, vol. 39, no. 2, pp. 447-462, 1976.
 ##' [2] J. D. Scargle, "Studies in astronomical time series analysis. II-Statistical aspects of spectral analysis of unevenly spaced data," The Astrophysical Journal, vol. 263, pp. 835-853, 1982.
+##' @export
 spec.ls <- function (ti, x, spans = NULL, freq = NULL, kernel = NULL, taper = 0.1,
                      type = "lomb", demean = FALSE, detrend = TRUE,
                      plot = TRUE, na.action = na.fail, ...) {
