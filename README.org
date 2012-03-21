@@ -15,10 +15,10 @@ This is migrated from [[http://tmdl.r-forge.r-project.org][r-forge]].
 
 *** Corrected Lomb-Scargle periodogram
 
-A [[https://stat.ethz.ch/pipermail/r-help/2009-June/201949.html][typo]][fn:: This is corrected now
-in /cts/] fixed in /cts::spec.ls/ implementation. Also normalization
+A [[https://stat.ethz.ch/pipermail/r-help/2009-June/201949.html][typo]][fn:fixed] fixed in /cts::spec.ls/ implementation. Also normalization
 is performed to satisfy Parseval's theorem, i.e. to match total
 variance in the signal.
+[fn:fixed] is corrected now in /cts/
 
 *** USGS water data
 
