@@ -7,15 +7,15 @@ There is no that much special stuff just something I find useful myself. Notably
 
 ** tmdl (a package to facilitate TMDL studies)
 
-This is migrated from [[tmdl.r-forge.r-project.org][r-forge]].
+This is migrated from [[http://tmdl.r-forge.r-project.org][r-forge]].
 
 # It also has some handy functions for /lattice/.
 
 ** miscelrneous
 
-*** Corrected Lomb-Scargle periodogra
+*** Corrected Lomb-Scargle periodogram
 
-A [[https://stat.ethz.ch/pipermail/r-help/2009-June/201949.html][typo]][fn:::This is corrected now
+A [[https://stat.ethz.ch/pipermail/r-help/2009-June/201949.html][typo]][fn:: This is corrected now
 in /cts/] fixed in /cts::spec.ls/ implementation. Also normalization
 is performed to satisfy Parseval's theorem, i.e. to match total
 variance in the signal.
