@@ -1,0 +1,30 @@
+#+Title: Some R stuff I use
+#+Author: Mikhail Titov
+
+* Intro
+
+There is no that much special stuff just something I find useful myself. Notably there are 3 main features so far.
+
+** tmdl (a package to facilitate TMDL studies)
+
+This is migrated from [[tmdl.r-forge.r-project.org][r-forge]].
+
+# It also has some handy functions for /lattice/.
+
+** miscelrneous
+
+*** Corrected Lomb-Scargle periodogra
+
+A [[https://stat.ethz.ch/pipermail/r-help/2009-June/201949.html][typo]][fn:::This is corrected now
+in /cts/] fixed in /cts::spec.ls/ implementation. Also normalization
+is performed to satisfy Parseval's theorem, i.e. to match total
+variance in the signal.
+
+*** USGS water data
+
+A couple of handy function
+
+- url.make.USGS
+- read.rdb.USGS
+
+to fetch data from [[http://nwis.waterdata.usgs.gov/nwis][National Water Information System]] @ USGS
