@@ -1,0 +1,9 @@
+#+TITLE: TMDL R package notes
+
+* Installation
+
+If you are on Windows, install [[http://cran.r-project.org/bin/windows/Rtools/][R tools]] then
+#+BEGIN_SRC R :eval no
+library(devtools)
+install_github("miscelRneous", "mlt", subdir="pkg/tmdl")
+#+END_SRC
