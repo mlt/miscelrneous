@@ -388,14 +388,15 @@ function (x, coef = .1, do.conf = TRUE, do.out = TRUE)
 xscale.components.fi <-
 function (..., intervals)
 {
-#        print(intervals)
     ans <- xscale.components.default(...)
     ans$bottom$ticks$at <- seq(0, 100, 10)
+    ans$bottom$labels$at <- ans$bottom$ticks$at
     ans$bottom$labels$labels <- ans$bottom$ticks$at
+    ans$bottom$labels$check.overlap <- FALSE
     ans$top <- ans$bottom
-    ans$top$labels$labels <- fi$labels #c("High flows", "Moist conditions",
-#        "Mid-range flows", "Dry conditions", "Low flows")
-    ans$top$ticks$at <- fi$mids #c(5, 25, 50, 75, 95)
+    ans$top$labels$at <- fi$mids
+    ans$top$labels$labels <- fi$labels
+    ans$top$ticks$at <- fi$mids
     ans$top$ticks$tck <- 0
     ans
 }
